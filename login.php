@@ -1,45 +1,45 @@
 <?php
-header('Content-Type: text/html; charset=UTF-8');
 session_start();
-
 if (!empty($_SESSION['login'])) {
-  if (!empty($_GET['logout'])) {
-    session_destroy();
-    header('Location: login.php');
+    header('Location: form.php');
     exit();
-  }
-  header('Location: index.php');
-  exit();
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-  ?>
-  <form action="login.php" method="POST">
-    <input name="login" placeholder="Логин" />
-    <input name="pass" placeholder="Пароль" type="password" />
-    <input type="submit" value="Войти" />
-  </form>
-  <?php
-} else {
-  $login = $_POST['login'];
-  $pass = $_POST['pass'];
+$errors = '';
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $login = $_POST['login'] ?? '';
+    $password = $_POST['password'] ?? '';
 
-  try {
-    $pdo = new PDO('mysql:host=localhost;dbname=u68818', 'u68818', '9972335', [
-      PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
-    ]);
-    $stmt = $pdo->prepare("SELECT id, password FROM users WHERE login = ?");
+    include 'db.php'; // Подключение к базе
+
+    $stmt = $pdo->prepare("SELECT id, password_hash FROM users WHERE login = ?");
     $stmt->execute([$login]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    $user = $stmt->fetch();
 
-    if ($user && password_verify($pass, $user['password'])) {
-      $_SESSION['login'] = $login;
-      $_SESSION['uid'] = $user['id'];
-      header('Location: index.php');
+    if ($user && password_verify($password, $user['password_hash'])) {
+        $_SESSION['login'] = $login;
+        $_SESSION['uid'] = $user['id'];
+        header('Location: form.php');
+        exit();
     } else {
-      echo "Неверный логин или пароль.";
+        $errors = 'Неверный логин или пароль.';
     }
-  } catch (PDOException $e) {
-    echo 'Ошибка: ' . $e->getMessage();
-  }
 }
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Вход</title>
+</head>
+<body>
+    <h2>Вход</h2>
+    <?php if (!empty($errors)) echo "<p style='color:red;'>$errors</p>"; ?>
+    <form method="POST">
+        <label>Логин: <input name="login" type="text" required></label><br>
+        <label>Пароль: <input name="password" type="password" required></label><br>
+        <input type="submit" value="Войти">
+    </form>
+</body>
+</html>
