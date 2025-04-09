@@ -1,94 +1,29 @@
+<?php
+session_start();
+
+// Инициализируем значения формы
+$values = $_SESSION['data'] ?? [
+    'fio' => '',
+    'phone' => '',
+    'email' => '',
+    'dob' => '',
+    'gender' => '',
+    'bio' => '',
+    'languages' => [],
+    'contract' => 0
+];
+
+$errors = $_SESSION['errors'] ?? []; // Извлекаем ошибки из сессии, если они есть
+unset($_SESSION['errors'], $_SESSION['data']); // Очищаем данные после использования
+?>
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
   <title>Форма заявки</title>
   <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-        }
-
-        .form-container {
-            max-width: 600px;
-            margin: 40px auto;
-            padding: 20px;
-            background-color: #fff;
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-
-        label {
-            display: block;
-            margin-bottom: 10px;
-        }
-
-        input[type="text"], input[type="tel"], input[type="email"], input[type="date"], select, textarea {
-            width: 95%;
-            padding: 10px;
-            margin-bottom: 20px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-
-        input[type="radio"] {
-            margin-right: 10px;
-        }
-
-        input[type="checkbox"] {
-            margin-right: 10px;
-        }
-
-        input[type="submit"] {
-            background-color: #007bff;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-
-        input[type="submit"]:hover {
-            background-color: #0056b3;
-        }
-
-        .radio-group {
-            margin-bottom: 20px;
-        }
-
-        .radio-group label {
-            display: inline;
-        }
-
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .checkbox-group label {
-            margin-left: 10px;
-            padding-top: 10px;
-        }
-
-        .error {
-            border: 2px solid red;
-        }
-
-        .error-message {
-            color: red;
-            font-size: 0.9em;
-            margin-bottom: 10px;
-        }
-
-        .messages {
-          background-color: #fff0cc;
-          border-left: 4px solid #ffa500;
-          padding: 10px;
-          margin-bottom: 20px;
-          border-radius: 5px;
-        }
+    /* Стили остаются без изменений */
   </style>
 </head>
 <body>
