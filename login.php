@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET') {
     <div class="login-container">
         <h2>Вход</h2>
         <form action="" method="post">
-            <input name="login" placeholder="Логин" required />
+            <input name="login" type="text" placeholder="Логин" required />
             <input name="pass" type="password" placeholder="Пароль" required />
             <input type="submit" value="Войти" />
         </form>
