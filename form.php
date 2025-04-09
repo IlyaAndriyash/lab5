@@ -1,3 +1,30 @@
+<?php
+if (!isset($values)) {
+    $values = [
+        'fio' => '',
+        'phone' => '',
+        'email' => '',
+        'dob' => '',
+        'gender' => '',
+        'languages' => [],
+        'bio' => '',
+        'contract' => false
+    ];
+}
+
+if (!isset($errors)) {
+    $errors = [
+        'fio' => false,
+        'phone' => false,
+        'email' => false,
+        'dob' => false,
+        'gender' => false,
+        'languages' => false,
+        'bio' => false,
+        'contract' => false
+    ];
+}
+?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
