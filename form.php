@@ -1,99 +1,74 @@
-<?php
-session_start();
-
-// Инициализируем значения формы
-$values = $_SESSION['data'] ?? [
-    'fio' => '',
-    'phone' => '',
-    'email' => '',
-    'dob' => '',
-    'gender' => '',
-    'bio' => '',
-    'languages' => [],
-    'contract' => 0
-];
-
-$errors = $_SESSION['errors'] ?? []; // Извлекаем ошибки из сессии, если они есть
-unset($_SESSION['errors'], $_SESSION['data']); // Очищаем данные после использования
-?>
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>Форма заявки</title>
-  <style>
-    /* Стили остаются без изменений */
-  </style>
+    <meta charset="UTF-8">
+    <title>Форма заявки</title>
+    <style>
+        .error { border: 2px solid red; }
+        .messages { background-color: #fff0cc; border-left: 4px solid #ffa500; padding: 10px; margin-bottom: 20px; }
+        body { font-family: Arial, sans-serif; }
+        input, select, textarea { margin-bottom: 10px; padding: 5px; }
+        input[type="submit"] { background-color: #007bff; color: white; border: none; padding: 10px; }
+    </style>
 </head>
 <body>
+<?php
+if (!empty($messages)) {
+    print('<div class="messages">');
+    foreach ($messages as $message) {
+        print($message);
+    }
+    print('</div>');
+}
+?>
 
-<div class="form-container">
-  <?php if (!empty($messages)): ?>
-    <div class="messages">
-      <?php foreach ($messages as $msg) echo "<p>$msg</p>"; ?>
-    </div>
-  <?php endif; ?>
-
-  <?php if (!empty($_SESSION['login'])): ?>
+<?php if (!empty($_SESSION['login'])): ?>
     <form action="index.php?logout=1" method="get">
-      <input type="submit" name="logout" value="Выйти">
+        <input type="submit" value="Выйти">
     </form>
-  <?php endif; ?>
+<?php endif; ?>
 
-  <form action="index.php" method="POST">
+<form action="" method="POST">
     <label>ФИО:
-      <input type="text" name="fio" value="<?= htmlspecialchars($values['fio']) ?>" class="<?= $errors['fio'] ? 'error' : '' ?>">
-    </label>
-
+        <input name="fio" <?php if ($errors['fio']) { print 'class="error"'; } ?> value="<?php print htmlspecialchars($values['fio']); ?>">
+    </label><br>
     <label>Телефон:
-      <input type="tel" name="phone" value="<?= htmlspecialchars($values['phone']) ?>" class="<?= $errors['phone'] ? 'error' : '' ?>">
-    </label>
-
+        <input name="phone" type="tel" <?php if ($errors['phone']) { print 'class="error"'; } ?> value="<?php print htmlspecialchars($values['phone']); ?>">
+    </label><br>
     <label>Email:
-      <input type="email" name="email" value="<?= htmlspecialchars($values['email']) ?>" class="<?= $errors['email'] ? 'error' : '' ?>">
-    </label>
-
+        <input name="email" type="email" <?php if ($errors['email']) { print 'class="error"'; } ?> value="<?php print htmlspecialchars($values['email']); ?>">
+    </label><br>
     <label>Дата рождения:
-      <input type="date" name="dob" value="<?= htmlspecialchars($values['dob']) ?>" class="<?= $errors['dob'] ? 'error' : '' ?>">
-    </label>
-
-    <div class="radio-group">
-      <label><input type="radio" name="gender" value="male" <?= $values['gender'] === 'male' ? 'checked' : '' ?>> Мужской</label>
-      <label><input type="radio" name="gender" value="female" <?= $values['gender'] === 'female' ? 'checked' : '' ?>> Женский</label>
-    </div>
-
+        <input name="dob" type="date" <?php if ($errors['dob']) { print 'class="error"'; } ?> value="<?php print htmlspecialchars($values['dob']); ?>">
+    </label><br>
+    <label>Пол:
+        <input type="radio" name="gender" value="male" <?php if ($values['gender'] === 'male') { print 'checked'; } ?>> Мужской
+        <input type="radio" name="gender" value="female" <?php if ($values['gender'] === 'female') { print 'checked'; } ?>> Женский
+        <?php if ($errors['gender']) { print '<span class="error">Ошибка</span>'; } ?>
+    </label><br>
     <label>Биография:
-      <textarea name="bio" rows="5" class="<?= $errors['bio'] ? 'error' : '' ?>"><?= htmlspecialchars($values['bio']) ?></textarea>
-    </label>
-
+        <textarea name="bio" <?php if ($errors['bio']) { print 'class="error"'; } ?>><?php print htmlspecialchars($values['bio']); ?></textarea>
+    </label><br>
     <label>Языки программирования:
-      <select name="languages[]" multiple size="4" class="<?= $errors['languages'] ? 'error' : '' ?>">
-        <?php
-        try {
-          $pdo = new PDO('mysql:host=localhost;dbname=u68818', 'u68818', '9972335');
-          $stmt = $pdo->query("SELECT name FROM programming_languages");
-          $all_langs = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-          foreach ($all_langs as $lang) {
-            $selected = in_array($lang, $values['languages']) ? 'selected' : '';
-            echo "<option value='$lang' $selected>$lang</option>";
-          }
-        } catch (PDOException $e) {
-          echo "<option disabled>Ошибка загрузки языков</option>";
-        }
-        ?>
-      </select>
-    </label>
-
-    <div class="checkbox-group">
-      <input type="checkbox" name="contract" <?= $values['contract'] ? 'checked' : '' ?>>
-      <label>С контрактом ознакомлен(а)</label>
-    </div>
-
+        <select name="languages[]" multiple size="4" <?php if ($errors['languages']) { print 'class="error"'; } ?>>
+            <?php
+            $stmt = $pdo->query("SELECT name FROM programming_languages");
+            while ($row = $stmt->fetch()) {
+                $selected = in_array($row['name'], $values['languages']) ? 'selected' : '';
+                print "<option value='{$row['name']}' $selected>{$row['name']}</option>";
+            }
+            ?>
+        </select>
+    </label><br>
+    <label>
+        <input type="checkbox" name="contract" <?php if ($values['contract']) { print 'checked'; } ?>> С контрактом ознакомлен(а)
+        <?php if ($errors['contract']) { print '<span class="error">Ошибка</span>'; } ?>
+    </label><br>
     <input type="submit" value="Сохранить">
-  </form>
-</div>
+</form>
 
+<?php if (empty($_SESSION['login'])): ?>
+    <p><a href="login.php">Войти</a></p>
+<?php endif; ?>
 </body>
 </html>
