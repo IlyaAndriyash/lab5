@@ -3,148 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Форма заявки</title>
+    <title>Форма</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-        }
-        
-        .form-container {
-            max-width: 600px;
-            margin: 40px auto;
-            padding: 20px;
-            background-color: #fff;
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 10px;
-        }
-        
-        input[type="text"], input[type="tel"], input[type="email"], input[type="date"], select, textarea {
-            width: 95%;
-            padding: 10px;
-            margin-bottom: 20px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-        
-        input[type="radio"] {
-            margin-right: 10px;
-        }
-        
-        input[type="checkbox"] {
-            margin-right: 10px;
-        }
-        
-        input[type="submit"] {
-            background-color: #007bff;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        
-        input[type="submit"]:hover {
-            background-color: #0056b3;
-        }
-        
-        .radio-group {
-            margin-bottom: 20px;
-        }
-        
-        .radio-group label {
-            display: inline;
-        }
-        
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        
-        .checkbox-group label {
-            margin-left: 10px;
-            padding-top: 10px;
-        }
-        
-        .error {
-            border: 2px solid red;
-        }
-        
-        .messages {
-            background-color: #fff0cc;
-            border-left: 4px solid #ffa500;
-            padding: 10px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-        }
+        body { font-family: Arial, sans-serif; background-color: #f0f0f0; }
+        .form-container { max-width: 600px; margin: 40px auto; padding: 20px; background-color: #fff; border: 1px solid #ddd; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        label { display: block; margin-bottom: 10px; }
+        input[type="text"], input[type="tel"], input[type="email"], input[type="date"], select, textarea { width: 95%; padding: 10px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 5px; }
+        input[type="radio"] { margin-right: 10px; }
+        input[type="checkbox"] { margin-right: 10px; }
+        input[type="submit"] { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+        input[type="submit"]:hover { background-color: #0056b3; }
+        .radio-group { margin-bottom: 20px; }
+        .radio-group label { display: inline; }
+        .checkbox-group { display: flex; align-items: center; margin-bottom: 20px; }
+        .checkbox-group label { margin-left: 10px; padding-top: 10px; }
+        .error { border: 2px solid red; }
+        .error-message { color: red; font-size: 0.9em; margin-bottom: 10px; }
     </style>
 </head>
 <body>
     <div class="form-container">
-        <?php if (!empty($messages)): ?>
-            <div class="messages">
-                <?php foreach ($messages as $message): ?>
-                    <p><?php print $message; ?></p>
-                <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
-
-        <?php if (!empty($_SESSION['login'])): ?>
-            <form action="index.php?logout=1" method="get">
-                <input type="submit" value="Выйти">
-            </form>
-        <?php endif; ?>
-
+        <h2>Форма</h2>
+        <?php
+        if (!empty($messages)) {
+            print('<div id="messages">');
+            foreach ($messages as $message) {
+                print($message);
+            }
+            print('</div>');
+        }
+        ?>
         <form action="" method="POST">
-            <label>ФИО:
-                <input name="fio" <?php if ($errors['fio']) { print 'class="error"'; } ?> value="<?php print htmlspecialchars($values['fio']); ?>">
-            </label>
-            <label>Телефон:
-                <input name="phone" type="tel" <?php if ($errors['phone']) { print 'class="error"'; } ?> value="<?php print htmlspecialchars($values['phone']); ?>">
-            </label>
-            <label>Email:
-                <input name="email" type="email" <?php if ($errors['email']) { print 'class="error"'; } ?> value="<?php print htmlspecialchars($values['email']); ?>">
-            </label>
-            <label>Дата рождения:
-                <input name="dob" type="date" <?php if ($errors['dob']) { print 'class="error"'; } ?> value="<?php print htmlspecialchars($values['dob']); ?>">
-            </label>
+            <label for="fio">ФИО:</label>
+            <input type="text" name="fio" id="fio" value="<?php print $values['fio']; ?>" <?php if ($errors['fio']) {print 'class="error"';} ?>>
+            <?php if ($errors['fio']) {print '<div class="error-message">Недопустимые символы в ФИО.</div>';} ?>
+
+            <label for="phone">Телефон:</label>
+            <input type="tel" name="phone" id="phone" value="<?php print $values['phone']; ?>" <?php if ($errors['phone']) {print 'class="error"';} ?>>
+            <?php if ($errors['phone']) {print '<div class="error-message">Формат: +7XXXXXXXXXX или XXXXXXXXXX.</div>';} ?>
+
+            <label for="email">Email:</label>
+            <input type="email" name="email" id="email" value="<?php print $values['email']; ?>" <?php if ($errors['email']) {print 'class="error"';} ?>>
+            <?php if ($errors['email']) {print '<div class="error-message">Некорректный email.</div>';} ?>
+
+            <label for="dob">Дата рождения:</label>
+            <input type="date" name="dob" id="dob" value="<?php print $values['dob']; ?>" <?php if ($errors['dob']) {print 'class="error"';} ?>>
+            <?php if ($errors['dob']) {print '<div class="error-message">Некорректная дата.</div>';} ?>
+
+            <label>Пол:</label>
             <div class="radio-group">
-                <label>Пол:</label>
-                <label><input type="radio" name="gender" value="male" <?php if ($values['gender'] === 'male') { print 'checked'; } ?>> Мужской</label>
-                <label><input type="radio" name="gender" value="female" <?php if ($values['gender'] === 'female') { print 'checked'; } ?>> Женский</label>
-                <?php if ($errors['gender']) { print '<span style="color: red;">Ошибка</span>'; } ?>
+                <input type="radio" name="gender" value="male" id="male" <?php if ($values['gender'] == 'male') {print 'checked';} ?>>
+                <label for="male">Мужской</label>
+                <input type="radio" name="gender" value="female" id="female" <?php if ($values['gender'] == 'female') {print 'checked';} ?>>
+                <label for="female">Женский</label>
             </div>
-            <label>Биография:
-                <textarea name="bio" rows="5" <?php if ($errors['bio']) { print 'class="error"'; } ?>><?php print htmlspecialchars($values['bio']); ?></textarea>
-            </label>
-            <label>Языки программирования:
-                <select name="languages[]" multiple <?php if ($errors['languages']) { print 'class="error"'; } ?>>
-                    <?php
-                    $stmt = $pdo->query("SELECT name FROM programming_languages");
-                    while ($row = $stmt->fetch()) {
-                        $selected = in_array($row['name'], $values['languages']) ? 'selected' : '';
-                        print "<option value='{$row['name']}' $selected>{$row['name']}</option>";
-                    }
-                    ?>
-                </select>
-            </label>
+            <?php if ($errors['gender']) {print '<div class="error-message">Выберите пол.</div>';} ?>
+
+            <label for="languages">Любимый язык программирования:</label>
+            <select name="languages[]" id="languages" multiple>
+                <?php
+                $languages = ['Pascal', 'C', 'C++', 'JavaScript', 'PHP', 'Python', 'Java', 'Haskell', 'Clojure', 'Prolog', 'Scala', 'Go'];
+                foreach ($languages as $language) {
+                    $selected = in_array($language, $values['languages']) ? 'selected' : '';
+                    print("<option value='$language' $selected>$language</option>");
+                }
+                ?>
+            </select>
+            <?php if ($errors['languages']) {print '<div class="error-message">Выберите хотя бы один язык.</div>';} ?>
+
+            <label for="bio">Биография:</label>
+            <textarea name="bio" id="bio" rows="5" cols="40" <?php if ($errors['bio']) {print 'class="error"';} ?>><?php print $values['bio']; ?></textarea>
+            <?php if ($errors['bio']) {print '<div class="error-message">Заполните биографию.</div>';} ?>
+
             <div class="checkbox-group">
-                <label><input type="checkbox" name="contract" <?php if ($values['contract']) { print 'checked'; } ?>> С контрактом ознакомлен(а)</label>
-                <?php if ($errors['contract']) { print '<span style="color: red;">Ошибка</span>'; } ?>
+                <input type="checkbox" name="contract" id="contract" <?php if ($values['contract']) {print 'checked';} ?>>
+                <label for="contract">С контрактом ознакомлен:</label>
             </div>
+            <?php if ($errors['contract']) {print '<div class="error-message">Необходимо ознакомиться с контрактом.</div>';} ?>
+
             <input type="submit" value="Сохранить">
         </form>
-
-        <?php if (empty($_SESSION['login'])): ?>
-            <p><a href="login.php">Войти</a></p>
-        <?php endif; ?>
     </div>
 </body>
 </html>
