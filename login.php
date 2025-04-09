@@ -1,45 +1,39 @@
 <?php
-session_start();
-if (!empty($_SESSION['login'])) {
-    header('Location: form.php');
-    exit();
+header('Content-Type: text/html; charset=UTF-8');
+$session_started = false;
+if (!empty($_COOKIE[session_name()]) && session_start()) {
+    $session_started = true;
+    if (!empty($_SESSION['login'])) {
+        header('Location: ./');
+        exit();
+    }
 }
 
-$errors = '';
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+if ($_SERVER['REQUEST_METHOD'] == 'GET') {
+?>
+<form action="" method="post">
+    <label>Логин: <input name="login"></label><br>
+    <label>Пароль: <input name="pass" type="password"></label><br>
+    <input type="submit" value="Войти">
+</form>
+<?php
+} else {
+    include 'db.php';
     $login = $_POST['login'] ?? '';
-    $password = $_POST['password'] ?? '';
-
-    include 'db.php'; // Подключение к базе
+    $pass = $_POST['pass'] ?? '';
 
     $stmt = $pdo->prepare("SELECT id, password_hash FROM users WHERE login = ?");
     $stmt->execute([$login]);
     $user = $stmt->fetch();
 
-    if ($user && password_verify($password, $user['password_hash'])) {
+    if ($user && password_verify($pass, $user['password_hash'])) {
+        if (!$session_started) {
+            session_start();
+        }
         $_SESSION['login'] = $login;
         $_SESSION['uid'] = $user['id'];
-        header('Location: form.php');
-        exit();
+        header('Location: ./');
     } else {
-        $errors = 'Неверный логин или пароль.';
+        echo "Неверный логин или пароль.";
     }
 }
-?>
-
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Вход</title>
-</head>
-<body>
-    <h2>Вход</h2>
-    <?php if (!empty($errors)) echo "<p style='color:red;'>$errors</p>"; ?>
-    <form method="POST">
-        <label>Логин: <input name="login" type="text" required></label><br>
-        <label>Пароль: <input name="password" type="password" required></label><br>
-        <input type="submit" value="Войти">
-    </form>
-</body>
-</html>
