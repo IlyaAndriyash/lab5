@@ -1,8 +1,8 @@
 <?php
 $host = 'localhost';
-$db   = 'u68818'; // Имя твоей базы данных
-$user = 'u68818'; // Твой логин
-$pass = '9972335'; // Твой пароль
+$db   = 'u68818';
+$user = 'u68818'; 
+$pass = '9972335'; 
 $charset = 'utf8mb4';
 
 $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
