@@ -43,7 +43,7 @@ if (isset($_GET['delete'])) {
         $stmt = $db->prepare("DELETE FROM applications WHERE id = ?");
         $stmt->execute([$_GET['delete']]);
         header('Location: admin.php');
-        exit(); // Добавлено exit()
+        exit();
     } catch (PDOException $e) {
         print('Ошибка при удалении: ' . htmlspecialchars($e->getMessage()));
         exit();
@@ -53,9 +53,9 @@ if (isset($_GET['delete'])) {
 // Обработка формы редактирования
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_id'])) {
     error_log("POST request received with edit_id: " . $_POST['edit_id']);
+    error_log("POST data: " . print_r($_POST, true)); // Отладка данных формы
     try {
         $db = getDbConnection();
-        $db->beginTransaction();
 
         // Валидация данных
         $errors = FALSE;
@@ -107,49 +107,52 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_id'])) {
             error_log("Validation errors: " . implode(", ", $error_messages));
             $_SESSION['edit_errors'] = $error_messages;
             $_SESSION['edit_values'] = $_POST;
-            $db->rollBack();
             header('Location: admin.php?edit=' . $_POST['edit_id']);
             exit();
-        } else {
-            error_log("Validation passed, updating database...");
-            // Обновление данных заявки
-            $stmt = $db->prepare("UPDATE applications SET fio = ?, phone = ?, email = ?, dob = ?, gender = ?, bio = ?, contract = ? WHERE id = ?");
-            $stmt->execute([$_POST['fio'], $_POST['phone'], $_POST['email'], $_POST['dob'], $_POST['gender'], $_POST['bio'], isset($_POST['contract']) ? 1 : 0, $_POST['edit_id']]);
-            error_log("Application updated for ID: " . $_POST['edit_id']);
-
-            // Удаление существующих языков
-            $db->prepare("DELETE FROM application_languages WHERE application_id = ?")->execute([$_POST['edit_id']]);
-            error_log("Existing languages deleted for application ID: " . $_POST['edit_id']);
-
-            // Добавление новых языков
-            $stmt = $db->prepare("SELECT id FROM programming_languages WHERE name = ?");
-            $insertLang = $db->prepare("INSERT INTO programming_languages (name) VALUES (?)");
-            $linkStmt = $db->prepare("INSERT INTO application_languages (application_id, language_id) VALUES (?, ?)");
-
-            foreach ($_POST['languages'] as $language) {
-                $stmt->execute([$language]);
-                $languageData = $stmt->fetch(PDO::FETCH_ASSOC);
-                if (!$languageData) {
-                    $insertLang->execute([$language]);
-                    $language_id = $db->lastInsertId();
-                    error_log("New language inserted: $language, ID: $language_id");
-                } else {
-                    $language_id = $languageData['id'];
-                    error_log("Existing language found: $language, ID: $language_id");
-                }
-                $linkStmt->execute([$_POST['edit_id'], $language_id]);
-                error_log("Linked language ID $language_id to application ID: " . $_POST['edit_id']);
-            }
-
-            $db->commit();
-            error_log("Transaction committed, redirecting to admin.php");
-            unset($_SESSION['edit_errors'], $_SESSION['edit_values']); // Очищаем сессию
-            header('Location: admin.php');
-            exit();
         }
+
+        // Начинаем транзакцию только после успешной валидации
+        $db->beginTransaction();
+        error_log("Validation passed, starting transaction...");
+
+        // Обновление данных заявки
+        $stmt = $db->prepare("UPDATE applications SET fio = ?, phone = ?, email = ?, dob = ?, gender = ?, bio = ?, contract = ? WHERE id = ?");
+        $stmt->execute([$_POST['fio'], $_POST['phone'], $_POST['email'], $_POST['dob'], $_POST['gender'], $_POST['bio'], isset($_POST['contract']) ? 1 : 0, $_POST['edit_id']]);
+        error_log("Application updated for ID: " . $_POST['edit_id']);
+
+        // Удаление существующих языков
+        $db->prepare("DELETE FROM application_languages WHERE application_id = ?")->execute([$_POST['edit_id']]);
+        error_log("Existing languages deleted for application ID: " . $_POST['edit_id']);
+
+        // Добавление новых языков
+        $stmt = $db->prepare("SELECT id FROM programming_languages WHERE name = ?");
+        $insertLang = $db->prepare("INSERT INTO programming_languages (name) VALUES (?)");
+        $linkStmt = $db->prepare("INSERT INTO application_languages (application_id, language_id) VALUES (?, ?)");
+
+        foreach ($_POST['languages'] as $language) {
+            $stmt->execute([$language]);
+            $languageData = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$languageData) {
+                $insertLang->execute([$language]);
+                $language_id = $db->lastInsertId();
+                error_log("New language inserted: $language, ID: $language_id");
+            } else {
+                $language_id = $languageData['id'];
+                error_log("Existing language found: $language, ID: $language_id");
+            }
+            $linkStmt->execute([$_POST['edit_id'], $language_id]);
+            error_log("Linked language ID $language_id to application ID: " . $_POST['edit_id']);
+        }
+
+        $db->commit();
+        error_log("Transaction committed, redirecting to admin.php");
+        unset($_SESSION['edit_errors'], $_SESSION['edit_values']); // Очищаем сессию
+        header('Location: admin.php');
+        exit();
     } catch (PDOException $e) {
         if ($db->inTransaction()) {
             $db->rollBack();
+            error_log("Transaction rolled back due to error");
         }
         error_log("Database error: " . $e->getMessage());
         print('Ошибка при редактировании: ' . htmlspecialchars($e->getMessage()));
