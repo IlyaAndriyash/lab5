@@ -49,13 +49,17 @@ if (isset($_GET['delete'])) {
 }
 
 // Обработка формы редактирования
+$errors = false;
+$error_messages = [];
+$app = null;
+$languages = [];
+$edit_id = 0;
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_id'])) {
     try {
         $db = getDbConnection();
 
         // Валидация данных
-        $errors = false;
-        $error_messages = [];
         if (empty($_POST['fio']) || !preg_match('/^[a-zA-Zа-яА-Я\s]{1,150}$/u', $_POST['fio'])) {
             $errors = true;
             $error_messages[] = 'Некорректное ФИО.';
@@ -89,9 +93,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_id'])) {
             $error_messages[] = 'Ознакомьтесь с контрактом.';
         }
 
+        $edit_id = filter_var($_POST['edit_id'], FILTER_VALIDATE_INT);
+        if ($edit_id === false || $edit_id <= 0) {
+            $errors = true;
+            $error_messages[] = 'Неверный ID заявки.';
+        }
+
         if ($errors) {
             // Сохраняем введенные данные для повторного отображения формы
-            $edit_id = filter_var($_POST['edit_id'], FILTER_VALIDATE_INT);
             $app = [
                 'id' => $edit_id,
                 'fio' => $_POST['fio'],
@@ -102,10 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_id'])) {
                 'bio' => $_POST['bio'],
                 'contract' => isset($_POST['contract']) ? 1 : 0,
             ];
-            $languages = $_POST['languages'];
-            foreach ($error_messages as $msg) {
-                print('<div class="error">Ошибка: ' . htmlspecialchars($msg) . '</div>');
-            }
+            $languages = isset($_POST['languages']) ? $_POST['languages'] : [];
         } else {
             // Начинаем транзакцию только после успешной валидации
             $db->beginTransaction();
@@ -142,8 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_id'])) {
         if ($db->inTransaction()) {
             $db->rollBack();
         }
-        print('Ошибка при редактировании: ' . htmlspecialchars($e->getMessage()));
-        exit();
+        $error_messages[] = 'Ошибка при редактировании: ' . htmlspecialchars($e->getMessage());
     }
 }
 
@@ -164,8 +169,7 @@ try {
                         GROUP BY pl.id");
     $stats = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    print('Ошибка при получении данных: ' . htmlspecialchars($e->getMessage()));
-    exit();
+    $error_messages[] = 'Ошибка при получении данных: ' . htmlspecialchars($e->getMessage());
 }
 ?>
 
@@ -174,7 +178,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <title>Панель администратора</title>
-    < نمونه style>
+    <style>
         body { font-family: Arial, sans-serif; background-color: #f0f0f0; }
         .container { max-width: 1000px; margin: 20px auto; padding: 20px; background-color: #fff; border: 1px solid #ddd; border-radius: 5px; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
@@ -193,6 +197,13 @@ try {
 <body>
     <div class="container">
         <h2>Панель администратора</h2>
+
+        <!-- Вывод сообщений об ошибках -->
+        <?php if (!empty($error_messages)): ?>
+            <?php foreach ($error_messages as $msg): ?>
+                <div class="error"><?php echo htmlspecialchars($msg); ?></div>
+            <?php endforeach; ?>
+        <?php endif; ?>
 
         <!-- Отображение заявок -->
         <h3>Заявки</h3>
@@ -222,106 +233,4 @@ try {
                     <td><?php echo $app['contract'] ? 'Да' : 'Нет'; ?></td>
                     <td>
                         <a href="?edit=<?php echo $app['id']; ?>">Редактировать</a> |
-                        <a href="?delete=<?php echo $app['id']; ?>" onclick="return confirm('Вы уверены?');">Удалить</a>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-        </table>
-
-        <!-- Статистика -->
-        <h3>Статистика по языкам программирования</h3>
-        <table>
-            <tr>
-                <th>Язык</th>
-                <th>Количество пользователей</th>
-            </tr>
-            <?php foreach ($stats as $stat): ?>
-                <tr>
-                    <td><?php echo htmlspecialchars($stat['name'] ?: 'Без языка'); ?></td>
-                    <td><?php echo $stat['count']; ?></td>
-                </tr>
-            <?php endforeach; ?>
-        </table>
-
-        <!-- Форма редактирования -->
-        <?php if (isset($_GET['edit']) || (isset($errors) && $errors)): 
-            $edit_id = isset($_GET['edit']) ? filter_var($_GET['edit'], FILTER_VALIDATE_INT) : (isset($_POST['edit_id']) ? $_POST['edit_id'] : 0);
-            if ($edit_id === false || $edit_id <= 0) {
-                print('<div class="error">Неверный ID заявки.</div>');
-            } else {
-                try {
-                    $db = getDbConnection();
-                    if (isset($errors) && $errors) {
-                        // Используем данные из POST при ошибке валидации
-                        $app = [
-                            'id' => $edit_id,
-                            'fio' => $_POST['fio'],
-                            'phone' => $_POST['phone'],
-                            'email' => $_POST['email'],
-                            'dob' => $_POST['dob'],
-                            'gender' => $_POST['gender'],
-                            'bio' => $_POST['bio'],
-                            'contract' => isset($_POST['contract']) ? 1 : 0,
-                        ];
-                        $languages = $_POST['languages'];
-                    } else {
-                        // Загружаем данные из базы
-                        $stmt = $db->prepare("SELECT * FROM applications WHERE id = ?");
-                        $stmt->execute([$edit_id]);
-                        $app = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                        if (!$app) {
-                            print('<div class="error">Заявка не найдена.</div>');
-                            $app = null;
-                        } else {
-                            $stmt = $db->prepare("SELECT pl.name FROM programming_languages pl JOIN application_languages al ON pl.id = al.language_id WHERE al.application_id = ?");
-                            $stmt->execute([$edit_id]);
-                            $languages = $stmt->fetchAll(PDO::FETCH_COLUMN);
-                        }
-                    }
-
-                    if ($app):
-        ?>
-                        <div class="form-container">
-                            <h3>Редактировать заявку #<?php echo $edit_id; ?></h3>
-                            <form method="POST">
-                                <input type="hidden" name="edit_id" value="<?php echo $edit_id; ?>">
-                                <label>ФИО:</label>
-                                <input type="text" name="fio" value="<?php echo htmlspecialchars($app['fio']); ?>">
-                                <label>Телефон:</label>
-                                <input type="tel" name="phone" value="<?php echo htmlspecialchars($app['phone']); ?>">
-                                <label>Email:</label>
-                                <input type="email" name="email" value="<?php echo htmlspecialchars($app['email']); ?>">
-                                <label>Дата рождения:</label>
-                                <input type="date" name="dob" value="<?php echo htmlspecialchars($app['dob']); ?>">
-                                <label>Пол:</label>
-                                <select name="gender">
-                                    <option value="male" <?php echo $app['gender'] == 'male' ? 'selected' : ''; ?>>Мужской</option>
-                                    <option value="female" <?php echo $app['gender'] == 'female' ? 'selected' : ''; ?>>Женский | selected | </option>
-                                </select>
-                                <label>Языки программирования:</label>
-                                <select name="languages[]" multiple>
-                                    <?php
-                                    $all_languages = ['Pascal', 'C', 'C++', 'JavaScript', 'PHP', 'Python', 'Java', 'Haskell', 'Clojure', 'Prolog', 'Scala', 'Go'];
-                                    foreach ($all_languages as $lang) {
-                                        $selected = in_array($lang, $languages) ? 'selected' : '';
-                                        echo "<option value='$lang' $selected>$lang</option>";
-                                    }
-                                    ?>
-                                </select>
-                                <label>Биография:</label>
-                                <textarea name="bio" rows="5"><?php echo htmlspecialchars($app['bio']); ?></textarea>
-                                <label><input type="checkbox" name="contract" <?php echo $app['contract'] ? 'checked' : ''; ?>> С контрактом ознакомлен</label>
-                                <input type="submit" value="Сохранить">
-                            </form>
-                        </div>
-        <?php
-                    endif;
-                } catch (PDOException $e) {
-                    print('<div class="error">Ошибка при загрузке формы: ' . htmlspecialchars($e->getMessage()) . '</div>');
-                }
-            }
-        endif; ?>
-    </div>
-</body>
-</html>
+                        <a href="?delete
