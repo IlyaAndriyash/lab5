@@ -107,10 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_id'])) {
             error_log("Validation errors: " . implode(", ", $error_messages));
             $_SESSION['edit_errors'] = $error_messages;
             $_SESSION['edit_values'] = $_POST;
-            // Проверяем, активна ли транзакция перед откатом
-            if ($db->inTransaction()) {
-                $db->rollBack();
-            }
+            $db->rollBack();
             header('Location: admin.php?edit=' . $_POST['edit_id']);
             exit();
         } else {
@@ -151,7 +148,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_id'])) {
             exit();
         }
     } catch (PDOException $e) {
-        // Проверяем, активна ли транзакция перед откатом
         if ($db->inTransaction()) {
             $db->rollBack();
         }
@@ -182,6 +178,7 @@ try {
     exit();
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -323,22 +320,18 @@ try {
                                     ?>
                                 </select>
                                 <label>Биография:</label>
-                                <textarea name="bio"><?php echo htmlspecialchars($values['bio']); ?></textarea>
-                                <label>
-                                    <input type="checkbox" name="contract" <?php echo $values['contract'] ? 'checked' : ''; ?>>
-                                    Ознакомлен с контрактом
-                                </label>
+                                <textarea name="bio" rows="5"><?php echo htmlspecialchars($values['bio']); ?></textarea>
+                                <label><input type="checkbox" name="contract" <?php echo !empty($values['contract']) ? 'checked' : ''; ?>> С контрактом ознакомлен</label>
                                 <input type="submit" value="Сохранить">
                             </form>
                         </div>
         <?php
                     }
                 } catch (PDOException $e) {
-                    print('<div class="error">Ошибка при загрузке заявки: ' . htmlspecialchars($e->getMessage()) . '</div>');
+                    print('<div class="error">Ошибка при загрузке формы: ' . htmlspecialchars($e->getMessage()) . '</div>');
                 }
             }
-        endif;
-        ?>
+        endif; ?>
     </div>
 </body>
 </html>
