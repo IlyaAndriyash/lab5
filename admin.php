@@ -1,17 +1,25 @@
 <?php
 header('Content-Type: text/html; charset=UTF-8');
 
-session_start(); // Запускаем сессию для хранения ошибок и данных формы
+session_start();
 
-// Функция для подключения к базе данных (DRY)
+// Функция для подключения к базе данных с проверкой активных транзакций
 function getDbConnection() {
-    return new PDO('mysql:host=localhost;dbname=u68818', 'u68818', '9972335', [
+    $db = new PDO('mysql:host=localhost;dbname=u68818', 'u68818', '9972335', [
         PDO::ATTR_PERSISTENT => true,
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_EMULATE_PREPARES => false
     ]);
+    
+    // Сброс любой активной транзакции перед началом новой
+    if ($db->inTransaction()) {
+        $db->rollBack();
+    }
+    
+    return $db;
 }
 
-// HTTP-аутентификация с использованием таблицы admins
+// HTTP-аутентификация
 try {
     $db = getDbConnection();
     if (empty($_SERVER['PHP_AUTH_USER']) || empty($_SERVER['PHP_AUTH_PW'])) {
@@ -43,7 +51,7 @@ if (isset($_GET['delete'])) {
         $stmt = $db->prepare("DELETE FROM applications WHERE id = ?");
         $stmt->execute([$_GET['delete']]);
         header('Location: admin.php');
-        exit(); // Добавлено exit()
+        exit();
     } catch (PDOException $e) {
         print('Ошибка при удалении: ' . htmlspecialchars($e->getMessage()));
         exit();
@@ -52,10 +60,10 @@ if (isset($_GET['delete'])) {
 
 // Обработка формы редактирования
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_id'])) {
-    error_log("POST request received with edit_id: " . $_POST['edit_id']);
     try {
         $db = getDbConnection();
         $db->beginTransaction();
+        error_log("Transaction started for edit_id: " . $_POST['edit_id']);
 
         // Валидация данных
         $errors = FALSE;
@@ -65,93 +73,91 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_id'])) {
         if (empty($_POST['fio']) || !preg_match('/^[a-zA-Zа-яА-Я\s]{1,150}$/u', $_POST['fio'])) {
             $errors = TRUE;
             $error_messages[] = 'Некорректное ФИО.';
-            error_log("Validation error: Некорректное ФИО");
         }
         if (empty($_POST['phone']) || !preg_match('/^\+?\d{10,15}$/', $_POST['phone'])) {
             $errors = TRUE;
             $error_messages[] = 'Некорректный телефон.';
-            error_log("Validation error: Некорректный телефон");
         }
         if (empty($_POST['email']) || !filter_var($_POST['email'], FILTER_VALIDATE_EMAIL)) {
             $errors = TRUE;
             $error_messages[] = 'Некорректный email.';
-            error_log("Validation error: Некорректный email");
         }
         if (empty($_POST['dob']) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['dob'])) {
             $errors = TRUE;
             $error_messages[] = 'Некорректная дата рождения.';
-            error_log("Validation error: Некорректная дата рождения");
         }
         if (empty($_POST['gender']) || !in_array($_POST['gender'], ['male', 'female'])) {
             $errors = TRUE;
             $error_messages[] = 'Выберите пол.';
-            error_log("Validation error: Некорректный пол");
         }
         if (empty($_POST['languages']) || !is_array($_POST['languages']) || count(array_diff($_POST['languages'], $all_languages)) > 0) {
             $errors = TRUE;
             $error_messages[] = 'Выберите корректные языки программирования.';
-            error_log("Validation error: Некорректные языки программирования");
         }
         if (empty($_POST['bio'])) {
             $errors = TRUE;
             $error_messages[] = 'Заполните биографию.';
-            error_log("Validation error: Пустая биография");
         }
         if (empty($_POST['contract'])) {
             $errors = TRUE;
             $error_messages[] = 'Ознакомьтесь с контрактом.';
-            error_log("Validation error: Контракт не отмечен");
         }
 
         if ($errors) {
-            error_log("Validation errors: " . implode(", ", $error_messages));
+            error_log("Validation errors found, rolling back");
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
             $_SESSION['edit_errors'] = $error_messages;
             $_SESSION['edit_values'] = $_POST;
-            $db->rollBack();
             header('Location: admin.php?edit=' . $_POST['edit_id']);
             exit();
-        } else {
-            error_log("Validation passed, updating database...");
-            // Обновление данных заявки
-            $stmt = $db->prepare("UPDATE applications SET fio = ?, phone = ?, email = ?, dob = ?, gender = ?, bio = ?, contract = ? WHERE id = ?");
-            $stmt->execute([$_POST['fio'], $_POST['phone'], $_POST['email'], $_POST['dob'], $_POST['gender'], $_POST['bio'], isset($_POST['contract']) ? 1 : 0, $_POST['edit_id']]);
-            error_log("Application updated for ID: " . $_POST['edit_id']);
-
-            // Удаление существующих языков
-            $db->prepare("DELETE FROM application_languages WHERE application_id = ?")->execute([$_POST['edit_id']]);
-            error_log("Existing languages deleted for application ID: " . $_POST['edit_id']);
-
-            // Добавление новых языков
-            $stmt = $db->prepare("SELECT id FROM programming_languages WHERE name = ?");
-            $insertLang = $db->prepare("INSERT INTO programming_languages (name) VALUES (?)");
-            $linkStmt = $db->prepare("INSERT INTO application_languages (application_id, language_id) VALUES (?, ?)");
-
-            foreach ($_POST['languages'] as $language) {
-                $stmt->execute([$language]);
-                $languageData = $stmt->fetch(PDO::FETCH_ASSOC);
-                if (!$languageData) {
-                    $insertLang->execute([$language]);
-                    $language_id = $db->lastInsertId();
-                    error_log("New language inserted: $language, ID: $language_id");
-                } else {
-                    $language_id = $languageData['id'];
-                    error_log("Existing language found: $language, ID: $language_id");
-                }
-                $linkStmt->execute([$_POST['edit_id'], $language_id]);
-                error_log("Linked language ID $language_id to application ID: " . $_POST['edit_id']);
-            }
-
-            $db->commit();
-            error_log("Transaction committed, redirecting to admin.php");
-            unset($_SESSION['edit_errors'], $_SESSION['edit_values']); // Очищаем сессию
-            header('Location: admin.php');
-            exit();
         }
+
+        // Обновление данных заявки
+        $stmt = $db->prepare("UPDATE applications SET fio = ?, phone = ?, email = ?, dob = ?, gender = ?, bio = ?, contract = ? WHERE id = ?");
+        $stmt->execute([
+            $_POST['fio'], 
+            $_POST['phone'], 
+            $_POST['email'], 
+            $_POST['dob'], 
+            $_POST['gender'], 
+            $_POST['bio'], 
+            isset($_POST['contract']) ? 1 : 0, 
+            $_POST['edit_id']
+        ]);
+
+        // Удаление существующих языков
+        $db->prepare("DELETE FROM application_languages WHERE application_id = ?")->execute([$_POST['edit_id']]);
+
+        // Добавление новых языков
+        $stmt = $db->prepare("SELECT id FROM programming_languages WHERE name = ?");
+        $insertLang = $db->prepare("INSERT INTO programming_languages (name) VALUES (?)");
+        $linkStmt = $db->prepare("INSERT INTO application_languages (application_id, language_id) VALUES (?, ?)");
+
+        foreach ($_POST['languages'] as $language) {
+            $stmt->execute([$language]);
+            $languageData = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$languageData) {
+                $insertLang->execute([$language]);
+                $language_id = $db->lastInsertId();
+            } else {
+                $language_id = $languageData['id'];
+            }
+            $linkStmt->execute([$_POST['edit_id'], $language_id]);
+        }
+
+        $db->commit();
+        error_log("Transaction committed successfully");
+        unset($_SESSION['edit_errors'], $_SESSION['edit_values']);
+        header('Location: admin.php');
+        exit();
     } catch (PDOException $e) {
+        error_log("Database error: " . $e->getMessage());
         if ($db->inTransaction()) {
             $db->rollBack();
+            error_log("Transaction rolled back due to error");
         }
-        error_log("Database error: " . $e->getMessage());
         print('Ошибка при редактировании: ' . htmlspecialchars($e->getMessage()));
         exit();
     }
@@ -272,7 +278,6 @@ try {
                         $stmt->execute([$edit_id]);
                         $languages = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
-                        // Используем сохраненные значения из сессии, если есть
                         $values = isset($_SESSION['edit_values']) ? $_SESSION['edit_values'] : [
                             'fio' => $app['fio'],
                             'phone' => $app['phone'],
