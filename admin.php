@@ -342,7 +342,7 @@ try {
                                 <input type="submit" value="Сохранить">
                             </form>
                         </div>
-        <?php —
+        <?php 
                     }
                 } catch (PDOException $e) {
                     print('<div class="error">Ошибка при загрузке формы: ' . htmlspecialchars($e->getMessage()) . '</div>');
