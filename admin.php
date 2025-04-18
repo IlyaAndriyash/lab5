@@ -17,12 +17,29 @@ function getDbConnection() {
 try {
     $db = getDbConnection();
     // Проверка наличия логина и пароля
+
+    ///$_SERVER — это предопределённый массив PHP, который содержит:
+    //Информацию о сервере
+    //Заголовки HTTP-запроса
+    //Сведения о текущем скрипте
+
+
     if (empty($_SERVER['PHP_AUTH_USER']) || empty($_SERVER['PHP_AUTH_PW'])) {
         header('HTTP/1.1 401 Unauthorized');
         header('WWW-Authenticate: Basic realm="My site"');
         print('<h1>401 Требуется авторизация</h1>');
         exit();
     }
+//После ввода данных браузер добавляет в следующий запрос заголовок:
+    //Authorization: Basic base64_encode(login:password)
+//PHP автоматически разбирает этот заголовок и помещает данные в:
+//$_SERVER['PHP_AUTH_USER'] — логин
+//$_SERVER['PHP_AUTH_PW'] — пароль
+    
+//Разбор заголовка Authorization происходит:
+//На уровне веб-сервера (Apache/Nginx)
+//До передачи управления PHP-скрипту
+//Автоматически, без вашего участия
 
     // Проверка логина и пароля в базе
     $stmt = $db->prepare("SELECT password_hash FROM admins WHERE login = ?");
@@ -44,9 +61,10 @@ try {
 // Обработка удаления заявки
 if (isset($_GET['delete'])) {
     try {
-        $db = getDbConnection();
+        $db = getDbConnection(); 
         $stmt = $db->prepare("DELETE FROM applications WHERE id = ?");
-        $stmt->execute([$_GET['delete']]);
+        $stmt->execute([$_GET['delete']]); //Если в URL есть параметр delete,
+        //удаляет соответствующую заявку из базы данных и перенаправляет обратно на страницу администратора.
         header('Location: admin.php'); // Перенаправление на главную страницу
         exit();
     } catch (PDOException $e) {
@@ -180,12 +198,25 @@ try {
                         LEFT JOIN programming_languages pl ON al.language_id = pl.id 
                         GROUP BY a.id");
     $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    //Для каждой заявки будет одна строка со всеми её данными
+    //и столбцом languages, содержащим список связанных с ней языков программирования (например: "PHP,JavaScript,Python").
+
+
 
     // Получение статистики по языкам
     $stmt = $db->query("SELECT pl.name, COUNT(al.application_id) as count 
                         FROM programming_languages pl 
                         LEFT JOIN application_languages al ON pl.id = al.language_id 
-                        GROUP BY pl.id");
+                        GROUP BY pl.id"); 
+    // Для каждого языка программирования будет показано, сколько заявок его используют
+
+
+
+
+    //Первый запрос возвращает данные о заявках с перечнем их языков
+//Второй запрос возвращает статистику - сколько раз каждый язык встречается в заявках
+
+
     $stats = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     print('Ошибка при получении данных: ' . htmlspecialchars($e->getMessage()));
