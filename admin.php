@@ -163,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_id'])) {
         }
 
     } catch (PDOException $e) {
-        $_SESSION['edit_errors'] = ['Ошибка при сохранении: ' . $e->getMessage()];
+      //  $_SESSION['edit_errors'] = ['Ошибка при сохранении: ' . $e->getMessage()];
         $_SESSION['edit_values'] = $_POST;
         header('Location: admin.php?edit=' . $_POST['edit_id']);
         exit();
