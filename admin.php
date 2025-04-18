@@ -1,19 +1,22 @@
 <?php
+// Установка заголовка для HTML с кодировкой UTF-8
 header('Content-Type: text/html; charset=UTF-8');
 
+// Запуск сессии для хранения ошибок и временных данных
 session_start();
 
-// Функция для подключения к базе данных
+// Функция для создания PDO-соединения с базой данных
 function getDbConnection() {
     return new PDO('mysql:host=localhost;dbname=u68818', 'u68818', '9972335', [
-        PDO::ATTR_PERSISTENT => true,
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+        PDO::ATTR_PERSISTENT => true, // Постоянное соединение
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION // Обработка ошибок через исключения
     ]);
 }
 
 // HTTP-аутентификация
 try {
     $db = getDbConnection();
+    // Проверка наличия логина и пароля
     if (empty($_SERVER['PHP_AUTH_USER']) || empty($_SERVER['PHP_AUTH_PW'])) {
         header('HTTP/1.1 401 Unauthorized');
         header('WWW-Authenticate: Basic realm="My site"');
@@ -21,10 +24,12 @@ try {
         exit();
     }
 
+    // Проверка логина и пароля в базе
     $stmt = $db->prepare("SELECT password_hash FROM admins WHERE login = ?");
     $stmt->execute([$_SERVER['PHP_AUTH_USER']]);
     $admin = $stmt->fetch(PDO::FETCH_ASSOC);
 
+    // Если пользователь не найден или пароль неверный
     if (!$admin || $admin['password_hash'] !== md5($_SERVER['PHP_AUTH_PW'])) {
         header('HTTP/1.1 401 Unauthorized');
         header('WWW-Authenticate: Basic realm="My site"');
@@ -36,13 +41,13 @@ try {
     exit();
 }
 
-// Обработка удаления
+// Обработка удаления заявки
 if (isset($_GET['delete'])) {
     try {
         $db = getDbConnection();
         $stmt = $db->prepare("DELETE FROM applications WHERE id = ?");
         $stmt->execute([$_GET['delete']]);
-        header('Location: admin.php');
+        header('Location: admin.php'); // Перенаправление на главную страницу
         exit();
     } catch (PDOException $e) {
         print('Ошибка при удалении: ' . htmlspecialchars($e->getMessage()));
@@ -55,44 +60,53 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_id'])) {
     try {
         $db = getDbConnection();
 
-        // Валидация данных
+        // Валидация входных данных
         $errors = FALSE;
         $error_messages = [];
         $all_languages = ['Pascal', 'C', 'C++', 'JavaScript', 'PHP', 'Python', 'Java', 'Haskell', 'Clojure', 'Prolog', 'Scala', 'Go'];
 
+        // Проверка ФИО
         if (empty($_POST['fio']) || !preg_match('/^[a-zA-Zа-яА-Я\s]{1,150}$/u', $_POST['fio'])) {
             $errors = TRUE;
             $error_messages[] = 'Некорректное ФИО.';
         }
+        // Проверка телефона
         if (empty($_POST['phone']) || !preg_match('/^\+?\d{10,15}$/', $_POST['phone'])) {
             $errors = TRUE;
             $error_messages[] = 'Некорректный телефон.';
         }
+        // Проверка email
         if (empty($_POST['email']) || !filter_var($_POST['email'], FILTER_VALIDATE_EMAIL)) {
             $errors = TRUE;
             $error_messages[] = 'Некорректный email.';
         }
+        // Проверка даты рождения
         if (empty($_POST['dob']) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['dob'])) {
             $errors = TRUE;
             $error_messages[] = 'Некорректная дата рождения.';
         }
+        // Проверка пола
         if (empty($_POST['gender']) || !in_array($_POST['gender'], ['male', 'female'])) {
             $errors = TRUE;
             $error_messages[] = 'Выберите пол.';
         }
+        // Проверка языков программирования
         if (empty($_POST['languages']) || !is_array($_POST['languages']) || count(array_diff($_POST['languages'], $all_languages)) > 0) {
             $errors = TRUE;
             $error_messages[] = 'Выберите корректные языки программирования.';
         }
+        // Проверка биографии
         if (empty($_POST['bio'])) {
             $errors = TRUE;
             $error_messages[] = 'Заполните биографию.';
         }
+        // Проверка согласия с контрактом
         if (empty($_POST['contract'])) {
             $errors = TRUE;
             $error_messages[] = 'Ознакомьтесь с контрактом.';
         }
 
+        // Если есть ошибки, сохранить их в сессии и перенаправить
         if ($errors) {
             $_SESSION['edit_errors'] = $error_messages;
             $_SESSION['edit_values'] = $_POST;
@@ -100,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_id'])) {
             exit();
         }
 
-        // Начинаем транзакцию
+        // Начать транзакцию
         $db->beginTransaction();
 
         try {
@@ -137,11 +151,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_id'])) {
                 $linkStmt->execute([$_POST['edit_id'], $language_id]);
             }
 
+            // Подтверждение транзакции
             $db->commit();
             unset($_SESSION['edit_errors'], $_SESSION['edit_values']);
             header('Location: admin.php');
             exit();
         } catch (Exception $e) {
+            // Откат транзакции при ошибке
             $db->rollBack();
             throw $e;
         }
@@ -157,6 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_id'])) {
 // Получение всех заявок
 try {
     $db = getDbConnection();
+    // Запрос для получения заявок с объединёнными языками
     $stmt = $db->query("SELECT a.*, GROUP_CONCAT(pl.name) as languages 
                         FROM applications a 
                         LEFT JOIN application_languages al ON a.id = al.application_id 
@@ -164,7 +181,7 @@ try {
                         GROUP BY a.id");
     $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Получение статистики
+    // Получение статистики по языкам
     $stmt = $db->query("SELECT pl.name, COUNT(al.application_id) as count 
                         FROM programming_languages pl 
                         LEFT JOIN application_languages al ON pl.id = al.language_id 
@@ -182,6 +199,7 @@ try {
     <meta charset="UTF-8">
     <title>Панель администратора</title>
     <style>
+        /* Стили для оформления страницы */
         body { font-family: Arial, sans-serif; background-color: #f0f0f0; }
         .container { max-width: 1000px; margin: 20px auto; padding: 20px; background-color: #fff; border: 1px solid #ddd; border-radius: 5px; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
@@ -201,7 +219,7 @@ try {
     <div class="container">
         <h2>Панель администратора</h2>
 
-        <!-- Отображение заявок -->
+        <!-- Отображение списка заявок -->
         <h3>Заявки</h3>
         <table>
             <tr>
@@ -235,7 +253,7 @@ try {
             <?php endforeach; ?>
         </table>
 
-        <!-- Статистика -->
+        <!-- Отображение статистики -->
         <h3>Статистика по языкам программирования</h3>
         <table>
             <tr>
@@ -250,7 +268,7 @@ try {
             <?php endforeach; ?>
         </table>
 
-        <!-- Форма редактирования -->
+        <!-- Форма редактирования заявки -->
         <?php if (isset($_GET['edit'])): 
             $edit_id = filter_var($_GET['edit'], FILTER_VALIDATE_INT);
             if ($edit_id === false || $edit_id <= 0) {
@@ -258,6 +276,7 @@ try {
             } else {
                 try {
                     $db = getDbConnection();
+                    // Получение данных заявки
                     $stmt = $db->prepare("SELECT * FROM applications WHERE id = ?");
                     $stmt->execute([$edit_id]);
                     $app = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -265,10 +284,12 @@ try {
                     if (!$app) {
                         print('<div class="error">Заявка не найдена.</div>');
                     } else {
+                        // Получение языков заявки
                         $stmt = $db->prepare("SELECT pl.name FROM programming_languages pl JOIN application_languages al ON pl.id = al.language_id WHERE al.application_id = ?");
                         $stmt->execute([$edit_id]);
                         $languages = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
+                        // Значения для формы (из сессии или из базы)
                         $values = isset($_SESSION['edit_values']) ? $_SESSION['edit_values'] : [
                             'fio' => $app['fio'],
                             'phone' => $app['phone'],
@@ -321,7 +342,7 @@ try {
                                 <input type="submit" value="Сохранить">
                             </form>
                         </div>
-        <?php
+        <?php —
                     }
                 } catch (PDOException $e) {
                     print('<div class="error">Ошибка при загрузке формы: ' . htmlspecialchars($e->getMessage()) . '</div>');
