@@ -5,14 +5,7 @@ header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 header("X-Content-Type-Options: nosniff");
 
-// Подключение к БД
-function getDbConnection() {
-    return new PDO('mysql:host=localhost;dbname=u68818', 'u68818', '9972335', [
-        PDO::ATTR_PERSISTENT => true,
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_EMULATE_PREPARES => false
-    ]);
-}
+require_once 'db.php';
 
 // Обработка CORS preflight
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -24,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_SERVER['CONTENT_TYPE'] === 'appli
     try {
         $input = json_decode(file_get_contents('php://input'), true);
         
-        // Валидация данных
+        // Валидация данных (аналогично index.php)
         $errors = [];
         
         if (empty($input['FIO']) || !preg_match('/^[\p{Cyrillic}\p{Latin}\s]{1,150}$/u', $input['FIO'])) {
@@ -39,53 +32,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_SERVER['CONTENT_TYPE'] === 'appli
             $errors['EMAIL'] = 'Некорректный email';
         }
         
-        if (empty($input['agreement'])) {
-            $errors['agreement'] = 'Необходимо согласие';
-        }
-        
         if (!empty($errors)) {
             http_response_code(400);
             echo json_encode(['success' => false, 'errors' => $errors]);
             exit;
         }
         
-        // Сохранение в БД
+        // Сохранение в БД (аналогично index.php)
         $db = getDbConnection();
-        $stmt = $db->prepare("INSERT INTO applications (fio, phone, email, comment) VALUES (?, ?, ?, ?)");
+        $db->beginTransaction();
+
+        $stmt = $db->prepare("INSERT INTO applications (fio, phone, email, dob, gender, bio, contract) VALUES (?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $input['FIO'],
             $input['PHONE'],
             $input['EMAIL'],
-            $input['COMMENT'] ?? ''
+            $input['DOB'] ?? '2000-01-01', // Дефолтное значение, если не передано
+            $input['GENDER'] ?? 'male',     // Дефолтное значение
+            $input['BIO'] ?? '',            // Пустая строка, если не передано
+            isset($input['CONTRACT']) ? 1 : 0
         ]);
         
-        // Генерация логина/пароля
+        $application_id = $db->lastInsertId();
+
+        // Генерация логина/пароля (как в index.php)
         $login = substr(md5(uniqid(rand(), true)), 0, 8);
         $pass = substr(md5(uniqid(rand(), true)), 0, 8);
         $pass_hash = password_hash($pass, PASSWORD_DEFAULT);
         
         $stmt = $db->prepare("INSERT INTO users (login, password_hash, application_id) VALUES (?, ?, ?)");
-        $stmt->execute([$login, $pass_hash, $db->lastInsertId()]);
+        $stmt->execute([$login, $pass_hash, $application_id]);
+
+        // Обработка языков программирования
+        if (!empty($input['LANGUAGES'])) {
+            $stmt = $db->prepare("SELECT id FROM programming_languages WHERE name = ?");
+            $insertLang = $db->prepare("INSERT INTO programming_languages (name) VALUES (?)");
+            $linkStmt = $db->prepare("INSERT INTO application_languages (application_id, language_id) VALUES (?, ?)");
+
+            foreach ($input['LANGUAGES'] as $language) {
+                $stmt->execute([$language]);
+                $languageData = $stmt->fetch(PDO::FETCH_ASSOC);
+                if (!$languageData) {
+                    $insertLang->execute([$language]);
+                    $language_id = $db->lastInsertId();
+                } else {
+                    $language_id = $languageData['id'];
+                }
+                $linkStmt->execute([$application_id, $language_id]);
+            }
+        }
+
+        $db->commit();
         
-        // Ответ
+        // Ответ с данными для входа (как в index.php)
         echo json_encode([
             'success' => true,
             'message' => 'Спасибо за вашу заявку! Мы свяжемся с вами в ближайшее время.',
             'credentials' => [
                 'login' => $login,
-                'password' => $pass,
-                'profile_url' => '/profile'
+                'password' => $pass
             ]
         ]);
         
     } catch (PDOException $e) {
+        $db->rollBack();
         error_log('Database error: ' . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Ошибка сервера']);
-    } catch (Exception $e) {
-        error_log('Error: ' . $e->getMessage());
-        http_response_code(400);
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'Ошибка сервера: ' . $e->getMessage()]);
     }
 } else {
     http_response_code(405);
